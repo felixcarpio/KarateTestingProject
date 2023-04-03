@@ -5,22 +5,26 @@ Background: Preconditions
     * url apiUrl 
     * def timeValidator = read('classpath:helpers/timeValidator.js')
 
-Scenario: Favorite articl
+Scenario: Favorite article
     # Get the list of all articles and get the last one.
     Given params {limit:1,offset:0}
     Given path 'articles'
     When method GET
     Then status 200
-
+    
     # Save the slug id and favorite count.
     * def slugid = response.articles[0].slug
-    * def favsCount = response.articles[0].favoritesCount
+    * def initialfavsCount = response.articles[0].favoritesCount
+    * def favoriteFlag = response.articles[0].favorited
+    * def favsCount = initialfavsCount+1
 
-    # Call the endpoint to favorte and specific article.
+    # Call the endpoint to favorite a specific article.
     Given path 'articles',slugid,'favorite'
+    Then print 'initial count now is ',initialfavsCount
     And request {}
     When method POST
     Then status 200
+    
 
     # Validate the schema of favorited article and verify the slug id and favorite count.
     And match response ==
@@ -54,7 +58,7 @@ Scenario: Favorite articl
                     }
                 ],
                 "favorited": true,
-                "favoritesCount": #(favsCount + 1)
+                "favoritesCount": #(favsCount)
             }
         }
     """
@@ -64,8 +68,9 @@ Scenario: Favorite articl
     Given path 'articles'
     When method GET
     Then status 200
+    Then print 'count now is ',favsCount
 
-    # Validate the schema and verify that favorited count has increased by 1.
+    # Validate the schema and verify that favorited count has increased by 1 and the slug id.
     And match response.articles[0] ==
     """
         {
@@ -77,7 +82,7 @@ Scenario: Favorite articl
             "createdAt": '#? timeValidator(_)',
             "updatedAt": '#? timeValidator(_)',
             "favorited": true,
-            "favoritesCount": #(favsCount + 1),
+            "favoritesCount": #(favsCount),
             "author": {
                 "username": '#string',
                 "bio": null,
@@ -86,6 +91,45 @@ Scenario: Favorite articl
             }
         }
     """
+
+    # Call the endpoint to delete the favorite of article by the slug id.
+    Given path 'articles',slugid,'favorite'
+    And request {}
+    When method DELETE
+    Then status 200
+
+    # Validate the schema of deleted favorited article.
+    And match response ==
+    """
+        {
+            "article": {
+                "id": '#number',
+                "slug": #(slugid),
+                "title": '#string',
+                "description": '#string',
+                "body": '#string',
+                "createdAt": '#? timeValidator(_)',
+                "updatedAt": '#? timeValidator(_)',
+                "authorId": '#number',
+                "tagList": [],
+                "author": {
+                    "username": '#string',
+                    "bio": null,
+                    "image": '#string',
+                    "following": '#boolean'
+                },
+                "favoritedBy": [],
+                "favorited": false,
+                "favoritesCount": #(initialfavsCount)
+            }
+        }
+    """
+    Then print 'count now is ',initialfavsCount
+
+    # ***************************************************************************************************************************
+    # ***************************************************** END OF SCENARIO *****************************************************
+    # ***************************************************************************************************************************
+    # ***************************************************************************************************************************
 
 
 Scenario: Comment articles
